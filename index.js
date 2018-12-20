@@ -52,6 +52,16 @@ function startServer() {
 		res.send('OK');
 	})
 
+  app.get('/game', (req, res, next) => {
+    var filePath = path.join(__dirname, './game.html')
+    res.sendFile(filePath);
+  })
+
+  app.get('/game.js', (req, res, next) => {
+    var filePath = path.join(__dirname, './game.js')
+    res.sendFile(filePath);
+  })
+
 	app.get('/auth/facebook',
 	  passport.authenticate('facebook'));
 
