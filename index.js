@@ -32,6 +32,10 @@ var port =  process.env.PORT
 
 function addSockets() {
 
+	io.on('connection', (socket) => {
+
+	});
+
 }
 
 function startServer() {
@@ -52,15 +56,25 @@ function startServer() {
 		res.send('OK');
 	})
 
-  app.get('/game', (req, res, next) => {
-    var filePath = path.join(__dirname, './game.html')
-    res.sendFile(filePath);
-  })
+	app.get('/login', (req, res, next) => {
+		var filePath = path.join(__dirname, './login.html');
 
-  app.get('/game.js', (req, res, next) => {
-    var filePath = path.join(__dirname, './game.js')
-    res.sendFile(filePath);
-  })
+		res.sendFile(filePath);
+	})
+
+	app.post('/login', (req, res, next) => {
+		passport.use(new FacebookStrategy({
+	    clientID: FACEBOOK_APP_ID,
+	    clientSecret: FACEBOOK_APP_SECRET,
+	    callbackURL: "http://localhost:3000/auth/facebook/callback"
+	  },
+	  function(accessToken, refreshToken, profile, cb) {
+	    User.findOrCreate({ facebookId: profile.id }, function (err, user) {
+	      return cb(err, user);
+	    });
+		 }
+		));
+	})
 
 	app.get('/auth/facebook',
 	  passport.authenticate('facebook'));
