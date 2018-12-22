@@ -43,7 +43,7 @@ SimplexNoise.prototype.dot = function(g, x, y) {
 	return g[0]*x + g[1]*y;
 };
 
-SimplexNoise.prototype.noise = function(xin, yin) {
+SimplexNoise.prototype.findTerrain = function(xin, yin) {
   var n0, n1, n2; // Noise contributions from the three corners
   // Skew the input space to determine which simplex cell we're in
   var F2 = 0.5*(Math.sqrt(3.0)-1.0);
@@ -95,8 +95,22 @@ SimplexNoise.prototype.noise = function(xin, yin) {
   }
   // Add contributions from each corner to get the final noise value.
   // The result is scaled to return values in the interval [-1,1].
-  return 70.0 * (n0 + n1 + n2);
+  var result = 70.0 * (n0 + n1 + n2);
+
+  // My code below
+  var terrain = ["water", "plains", "forest", "mountain"]
+
+  if (-1 <= result && result < 2 / terrain.length * 1 - 1) {
+    return terrain[0];
+  } else if (result < 2 / terrain.length * 2 - 1) {
+    return terrain[1];
+  } else if (result < 2 / terrain.length * 3 - 1) {
+    return terrain[2];
+  } else if (result <= 2 / terrain.length * 4 - 1) {
+    return terrain[3];
+  }
 };
+
 ///////////////////////////////////////////////////////////////////////////////
 
 // Player class
@@ -107,6 +121,13 @@ class Player { // TODO: Implement player depending on what class they choose
     this.image = new Image();
     this.image.src = "images/whiteCastle.png";
   }
+
+  drawPlayer() {
+    var x = tileSize * (this.q * 3/2) + scrollX;
+    var y = tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
+
+    context.drawImage(this.image, x - 0.5 * tileSize, y - 0.5 * tileSize, tileSize, tileSize);
+  }
 }
 
 // Card Class
@@ -116,30 +137,137 @@ class Card { // TODO: Add in cards depending on what the set is and determines w
   }
 }
 
+// Tile Class
+class Tile {
+  constructor(q, r, terrain) {
+    this.q = q;
+    this.r = r;
+    this.terrain = terrain;
+    this.resource = null;
+
+    this.occupied = false;
+    this.visible = true;
+    this.seen = true;
+  }
+
+  generateResources() {
+    var rand = Math.random();
+
+    if (this.terrain == "forest") {
+      if (rand < 0.33) {
+        this.resource = new Wood();
+      } else if (rand < 0.66) {
+        this.resource = new Food();
+      } else {
+        this.resource = new Plants();
+      }
+    } else if (this.terrain == "mountain") {
+      this.resource = new Metal();
+    } else if (this.terrain == "plains") {
+      if (rand < 0.5) {
+        this.resource = new Food();
+      } else {
+        this.resource = new Plants();
+      }
+    }
+  }
+
+  mouseInsideTile() {
+    var x = tileSize * (this.q * 3/2) + scrollX;
+    var y = tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
+
+    if (mouseX < x - tileSize || mouseX > x + tileSize || mouseY > y + tileSize * Math.sqrt(3)/2 || mouseY < y - tileSize * Math.sqrt(3)/2) {
+      return false; // If the mouse is not in the hexagon's bounding box, return false
+    } else {
+      var tempX = mouseX; // Make temporary mouse vars
+      var tempY = mouseY;
+
+      tempX = Math.abs(tempX - x) + x; // Make sure that x and y positions are in the positive quadrant
+      tempY = Math.abs(tempY - y) + y;
+
+      if (tempY - (y + tileSize * Math.sqrt(3)/2) < -1 * Math.sqrt(3) * (tempX - (x + tileSize * 1/2))) {
+        return true; // Formula could use some improvement
+      } else {
+        return false;
+      }
+    }
+  }
+
+  drawTile() {
+    // Translate axial coordinates to Cartesian coordinates
+    var x = tileSize * (this.q * 3/2) + scrollX;
+    var y = tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
+
+    // Replace with hex images
+    context.beginPath();
+    context.moveTo(x - tileSize * 1/2, y + tileSize * Math.sqrt(3)/2);
+    context.lineTo(x + tileSize * 1/2, y + tileSize * Math.sqrt(3)/2);
+    context.lineTo(x + tileSize, y);
+    context.lineTo(x + tileSize * 1/2, y - tileSize * Math.sqrt(3)/2);
+    context.lineTo(x - tileSize * 1/2, y - tileSize * Math.sqrt(3)/2);
+    context.lineTo(x - tileSize, y);
+    context.lineTo(x - tileSize * 1/2, y + tileSize * Math.sqrt(3)/2);
+    context.stroke();
+    context.closePath();
+
+    if (this.terrain == "mountain") {
+      context.fillStyle = "#867e70";
+    } else if (this.terrain == "water") {
+      context.fillStyle = "#1e5878";
+    } else if (this.terrain == "plains") {
+      context.fillStyle = "#b5902f";
+    } else if (this.terrain == "forest") {
+      context.fillStyle = "#415241";
+    }
+
+    context.fill();
+
+    if (this.resource) {
+      context.drawImage(this.resource.image, x - tileSize * 0.5, y - tileSize * 0.5, tileSize, tileSize);
+    }
+  }
+
+  checkEdge() {
+    if (this.q == -boardSize || this.q == boardSize) {
+      return true;
+    } else if (this.r == boardSize || this.r == -boardSize) {
+      return true;
+    } else if (this.r + this.q == boardSize || this.r + this.q == -boardSize) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
+
 // Resources Class
 // TODO: Add a static function for gathering cards and for cooldowns for gathering
 class Metal {
   constructor() {
     this.image = new Image();
     this.image.src = "images/metal.png";
+    this.name = "metal";
   }
 }
 class Plants {
   constructor() {
     this.image = new Image();
     this.image.src = "images/plants.png";
+    this.name = "plants";
   }
 }
 class Food {
   constructor() {
     this.image = new Image();
     this.image.src = "images/food.png";
+    this.name = "food";
   }
 }
 class Wood {
   constructor() {
     this.image = new Image();
     this.image.src = "images/wood.png";
+    this.name = "wood";
   }
 }
 
@@ -160,7 +288,7 @@ var scrollX = 0; // How far away the user's "sight" is from the center
 var scrollY = 0;
 var oSize = 30;
 var tileSize = oSize;
-var boardSize = 15;
+var boardSize = 10;
 var resourceFreq = 0.13;
 var players = [];
 
@@ -196,6 +324,8 @@ document.addEventListener("wheel", function(e) {
     }
   }
 
+  document.getElementById("zoom-info").innerHTML = `x${Math.round(zoom * 10000) / 100}%`;
+
   // Add zoom to mouse
 })
 
@@ -225,7 +355,7 @@ document.addEventListener("mouseup", function(e) {
   dragMode = false;
 })
 
-document.addEventListener("mousemove", function(e) {
+document.addEventListener("mousemove", function(e) { // Panning
   var xMaxScale = boardSize * 100;
   var yMaxScale = boardSize * 130;
 
@@ -248,66 +378,35 @@ document.addEventListener("mousemove", function(e) {
   }
 })
 
-document.getElementById("shifting-thrones").addEventListener("mousemove", function(e) {
+document.addEventListener("mousemove", function(e) { // Tile identifying
+  if (zoom > 0.9) {
+    for (var i = 0; i < board.length; i++) {
+      if (board[i].mouseInsideTile()) {
+        document.getElementById("tile-info").innerHTML = `(${board[i].q}, ${board[i].r}): ${board[i].terrain}`;
+
+        if (board[i].resource) {
+          document.getElementById("tile-info").innerHTML += `, ${board[i].resource.name}`;
+        }
+        break;
+      }
+    }
+  } else {
+    document.getElementById("tile-info").innerHTML = '';
+  }
+})
+
+document.getElementById("shifting-thrones").addEventListener("mousemove", function(e) { // Getting mouse positions
   mouseX = e.clientX;
   mouseY = e.clientY;
 })
 
-function drawTile(q, r, size, info) { // Info is in [terrain, resources, list of traps, (Add more)]
-  // Translate axial coordinates to Cartesian coordinates
-  var x = size * (q * 3/2) + scrollX;
-  var y = size * (q * Math.sqrt(3)/2 + r * Math.sqrt(3)) + scrollY;
-  var terrain = info[0];
-  var resource = info[1];
-
-  // Replace with hex images
-  context.beginPath();
-  context.moveTo(x - size * 1/2, y + size * Math.sqrt(3)/2);
-  context.lineTo(x + size * 1/2, y + size * Math.sqrt(3)/2);
-  context.lineTo(x + size, y);
-  context.lineTo(x + size * 1/2, y - size * Math.sqrt(3)/2);
-  context.lineTo(x - size * 1/2, y - size * Math.sqrt(3)/2);
-  context.lineTo(x - size, y);
-  context.lineTo(x - size * 1/2, y + size * Math.sqrt(3)/2);
-  context.stroke();
-  context.closePath();
-
-  if (terrain == "mountain") {
-    context.fillStyle = "#867e70";
-  } else if (terrain == "water") {
-    context.fillStyle = "#1e5878";
-  } else if (terrain == "plains") {
-    context.fillStyle = "#b5902f";
-  } else if (terrain == "forest") {
-    context.fillStyle = "#415241";
-  }
-
-  context.fill();
-
-  if (resource) {
-    context.drawImage(resource.image, x - size * 0.5, y - size * 0.5, size, size);
-  }
-}
-
-function drawBoard(size) {
-  // For bla bla on board, drawHex
-
+function drawBoard() {
   for (var i = 0; i < board.length; i++) {
-    var q = board[i][0];
-    var r = board[i][1];
-    var terrain = board[i][2];
-    var resource = board[i][3];
-
-    drawTile(q, r, tileSize, [terrain, resource]);
+    board[i].drawTile();
   }
-}
 
-function drawPlayers() {
   for (var i = 0; i < players.length; i++) {
-    var x = tileSize * (players[i].q * 3/2) + scrollX;
-    var y = tileSize * (players[i].q * Math.sqrt(3)/2 + players[i].r * Math.sqrt(3)) + scrollY;
-
-    context.drawImage(players[i].image, x - 0.5 * tileSize, y - 0.5 * tileSize, tileSize, tileSize);
+    players[i].drawPlayer();
   }
 }
 
@@ -317,7 +416,7 @@ function setupBoard(size) {
 
   while (true) {
     while (true) {
-      board.push([q, r, findTerrain(noiseGen.noise(q, r))]);
+      board.push(new Tile(q, r, terrainGen.findTerrain(q, r)));
 
       if (q <= 0 && r == size) {
         break;
@@ -342,48 +441,7 @@ function setupBoard(size) {
   for (var i = 0; i < board.length; i++) {
     var rand = Math.random();
     if (rand < resourceFreq) { // The chance for each tile to generate a resource
-      board[i].push(generateResources(board[i]));
-    } else {
-      board[i].push(null);
-    }
-  }
-}
-
-function findTerrain(noise) {
-  var terrain = ["water", "plains", "forest", "mountain"]
-
-  if (-1 <= noise && noise < 2 / terrain.length * 1 - 1) {
-    return terrain[0];
-  } else if (noise < 2 / terrain.length * 2 - 1) {
-    return terrain[1];
-  } else if (noise < 2 / terrain.length * 3 - 1) {
-    return terrain[2];
-  } else if (noise <= 2 / terrain.length * 4 - 1) {
-    return terrain[3];
-  }
-}
-
-function generateResources(tile) { // TODO: Implement a generation of resources depending on terrain
-  var terrain = tile[2];
-  var rand = Math.random();
-
-  if (terrain == "water") {
-    return null;
-  } else if (terrain == "forest") {
-    if (rand < 0.33) {
-      return new Wood();
-    } else if (rand < 0.66) {
-      return new Food();
-    } else {
-      return new Plants();
-    }
-  } else if (terrain == "mountain") {
-    return new Metal();
-  } else if (terrain == "plains") {
-    if (rand < 0.5) {
-      return new Food();
-    } else {
-      return new Plants();
+      board[i].generateResources();
     }
   }
 }
@@ -392,7 +450,7 @@ function destroyBorders() {
   var count = 0;
 
   while (true) {
-    if (board.length < count) {
+    if (board.length <= count) {
       break;
     }
 
@@ -407,25 +465,6 @@ function destroyBorders() {
   boardSize--;
 }
 
-function checkEdge(tile) {
-  if (tile) {
-    var q = tile[0];
-    var r = tile[1];
-
-    if (q == -boardSize || q == boardSize) {
-      return true;
-    } else if (r == boardSize || r == -boardSize) {
-      return true;
-    } else if (r + q == boardSize || r + q == -boardSize) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  return false;
-}
-
 function init() {
   setupBoard(boardSize);
   drawBoard(board);
@@ -438,8 +477,7 @@ function update() { // TODO: Add in selection of tiles
 
 function draw() {
   context.clearRect(0, 0, $canvas.width, $canvas.height);
-  drawBoard(tileSize);
-  drawPlayers();
+  drawBoard();
 
   return 0;
 }
@@ -456,7 +494,7 @@ function animate() {
   }
 }
 
-var noiseGen = new SimplexNoise(Math);
+var terrainGen = new SimplexNoise(Math);
 
 players.push(new Player('white'))
 
