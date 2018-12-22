@@ -28,7 +28,7 @@ var io = Io(server);
 /* Defines what port to use to listen to web requests */
 var port =  process.env.PORT
 						? parseInt(process.env.PORT):
-						6666;
+						8888;
 
 function addSockets() {
 
@@ -54,6 +54,41 @@ function startServer() {
 	app.post('/', (req, res, next) => {
 		console.log(req.body);
 		res.send('OK');
+	})
+
+	app.get('/game', (req, res, next) => {
+		var filePath = path.join(__dirname, './game.html');
+		res.sendFile(filePath);
+	})
+
+	app.get('/game.js', (req, res, next) => {
+		var filePath = path.join(__dirname, './game.js');
+		res.sendFile(filePath);
+	})
+
+	app.get('/images/food.png', (req, res, next) => {
+		var filePath = path.join(__dirname, './images/food.png')
+		res.sendFile(filePath);
+	})
+
+	app.get('/images/metal.png', (req, res, next) => {
+		var filePath = path.join(__dirname, './images/metal.png')
+		res.sendFile(filePath);
+	})
+
+	app.get('/images/plants.png', (req, res, next) => {
+		var filePath = path.join(__dirname, './images/plants.png')
+		res.sendFile(filePath);
+	})
+
+	app.get('/images/wood.png', (req, res, next) => {
+		var filePath = path.join(__dirname, './images/wood.png')
+		res.sendFile(filePath);
+	})
+
+	app.get('/images/whiteCastle.png', (req, res, next) => {
+		var filePath = path.join(__dirname, './images/whiteCastle.png')
+		res.sendFile(filePath);
 	})
 
 	app.get('/login', (req, res, next) => {
