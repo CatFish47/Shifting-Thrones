@@ -115,25 +115,137 @@ SimplexNoise.prototype.findTerrain = function(xin, yin) {
 
 // Player class
 class Player { // TODO: Implement player depending on what class they choose
-  constructor(type) {
+  constructor(type, id) {
     this.q = 0;
     this.r = -boardSize;
     this.image = new Image();
     this.image.src = "images/whiteCastle.png";
+
+    this.turn = 0;
+
+    this.maxHP = 10;
+    this.hp = this.maxHP;
+
+    this.maxMoves = 5;
+    this.moves = this.maxMoves;
+
+    this.selected = false; // When clicked on, true
+
+    this.cards = [];
+    this.traps = [];
+    this.units = [];
+
+    this.you;
+    this.onResource;
+
+    if (id == playerId) {
+      this.you = true;
+    } else {
+      this.you = false;
+    }
   }
 
-  drawPlayer() {
-    var x = tileSize * (this.q * 3/2) + scrollX;
-    var y = tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
+  draw() {
+    var x = boardCenter.x + tileSize * (this.q * 3/2) + scrollX;
+    var y = boardCenter.y + tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
 
     context.drawImage(this.image, x - 0.5 * tileSize, y - 0.5 * tileSize, tileSize, tileSize);
+  }
+
+  update() {
+    var positions = this.calcPossibleMovement();
+
+    for (var i = 0; i < positions.length; i++) {
+      //this.selected ? positions[i].canMoveOn = true : positions[i].canMoveOn = false;
+      if (this.selected) {
+        positions[i].canMoveOn = true;
+      }
+    }
+  }
+
+  move(q, r) {
+    //if (this.moves > 0) {
+      this.q = q;
+      this.r = r;
+
+      for (var i = 0; i < board.length; i++) {
+        board[i].canMoveOn = false;
+      }
+
+      this.moves--;
+    //}
+  }
+
+  calcPossibleMovement() {
+    var positions = [];
+    var movePower = 2;
+
+    for (var i = 0; i < board.length; i++) {
+      if (this.inRadius(movePower, board[i]) && board[i].terrain != "water") {
+        positions.push(board[i]);
+      }
+    }
+
+    return positions;
+  }
+
+  inRadius(rad, tile) {
+    var q = -rad;
+    var r = 0;
+    var tempBoard = [];
+
+    while (true) {
+      while (true) {
+        tempBoard.push(new Tile(q + this.q, r + this.r, null));
+
+        if (q <= 0 && r == rad) {
+          break; // If the col# is less than 0 and r reaches the bottom, move on
+        } else if (q > 0 && r == rad - q) {
+          break; // If it's more than 0, and r reaches bottom, move on
+        } else {
+          r++; // If not, continue with increasing the row#
+        }
+      }
+
+      if (q == rad && r == 0) { // If last column and last row, end
+        break;
+      } else if (q < 0) { // Reset to next column
+        q++;
+        r = -rad - q;
+      } else if (q >= 0) { // Reset to next column
+        q++;
+        r = -rad;
+      }
+    }
+
+    for (var i = 0; i < tempBoard.length; i++) {
+      if (tempBoard[i].q == tile.q && tempBoard[i].r == tile.r) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  collectResource() {
+
   }
 }
 
 // Card Class
 class Card { // TODO: Add in cards depending on what the set is and determines what the ability is depending on an array of names
   constructor(set, name) {
+    var card;
 
+    for (var i = 0; i < set.length; i++) {
+      if (set[i].name == name) {
+        card = set[i];
+      }
+    }
+
+    this.name = card.name;
+    this.desc = card.desc;
+    this.effect = eval(card.effect);
   }
 }
 
@@ -148,6 +260,7 @@ class Tile {
     this.occupied = false;
     this.visible = true;
     this.seen = true;
+    this.canMoveOn = false;
   }
 
   generateResources() {
@@ -173,8 +286,8 @@ class Tile {
   }
 
   mouseInsideTile() {
-    var x = tileSize * (this.q * 3/2) + scrollX;
-    var y = tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
+    var x = boardCenter.x + tileSize * (this.q * 3/2) + scrollX;
+    var y = boardCenter.y + tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
 
     if (mouseX < x - tileSize || mouseX > x + tileSize || mouseY > y + tileSize * Math.sqrt(3)/2 || mouseY < y - tileSize * Math.sqrt(3)/2) {
       return false; // If the mouse is not in the hexagon's bounding box, return false
@@ -193,10 +306,18 @@ class Tile {
     }
   }
 
-  drawTile() {
+  draw() {
     // Translate axial coordinates to Cartesian coordinates
-    var x = tileSize * (this.q * 3/2) + scrollX;
-    var y = tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
+    var x = boardCenter.x + tileSize * (this.q * 3/2) + scrollX;
+    var y = boardCenter.y + tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
+
+    if (this.canMoveOn) {
+      context.strokeStyle = "#fff";
+      context.lineWidth = 5;
+    } else {
+      context.strokeStyle = "#000";
+      context.lineWidth = 1;
+    }
 
     // Replace with hex images
     context.beginPath();
@@ -209,6 +330,7 @@ class Tile {
     context.lineTo(x - tileSize * 1/2, y + tileSize * Math.sqrt(3)/2);
     context.stroke();
     context.closePath();
+
 
     if (this.terrain == "mountain") {
       context.fillStyle = "#867e70";
@@ -237,6 +359,85 @@ class Tile {
     } else {
       return false;
     }
+  }
+}
+
+// Trap class
+class Trap {
+  constructor(q, r, range, dmg, image) {
+    this.q = q;
+    this.r = r;
+    this.range = range;
+    this.dmg = dmg;
+    this.image = new Image();
+    image.src = image;
+  }
+
+  inRange(player) {
+    var q = -this.range;
+    var r = 0;
+    var tempBoard = [];
+
+    while (true) {
+      while (true) {
+        tempBoard.push(new Tile(q + this.q, r + this.r, null));
+
+        if (q <= 0 && r == this.range) {
+          break; // If the col# is less than 0 and r reaches the bottom, move on
+        } else if (q > 0 && r == this.range - q) {
+          break; // If it's more than 0, and r reaches bottom, move on
+        } else {
+          r++; // If not, continue with increasing the row#
+        }
+      }
+
+      if (q == this.range && r == 0) { // If last column and last row, end
+        break;
+      } else if (q < 0) { // Reset to next column
+        q++;
+        r = -this.range - q;
+      } else if (q >= 0) { // Reset to next column
+        q++;
+        r = -this.range;
+      }
+    }
+
+    for (var i = 0; i < tempBoard.length; i++) {
+      if (tempBoard[i].q == player.q && tempBoard[i].r == player.r) {
+        player.hp -= this.dmg;
+        this.destroy();
+      }
+    }
+  }
+
+  destroy() {
+    for (var i = 0; i < players.length; i++) {
+      for (var j = 0; i < players[i].traps.length; j++) {
+        if (players[i].traps[j].q == this.q && players[i].traps[j].r == this.r) {
+          players[i].traps[j].pop(); // NOTE: This code might be wrong
+        }
+      }
+    }
+  }
+}
+
+// Units class
+/*class Unit {
+  constructor(q, r, dmg, ) {
+
+  }
+}*/
+
+// Attack Class
+class Attack {
+  constructor(q, r, dmg) {
+    this.q = q;
+    this.r = r;
+    this.dmg = dmg;
+  }
+
+  initiate() {
+    // Add code later
   }
 }
 
@@ -272,15 +473,62 @@ class Wood {
 }
 
 // General variables
+var playerId = "lol";
 var food = [
-  {}
+  {
+    name: "Footsoldiers",
+    desc: "Places a camp of footsoldiers that will deal 1 damage to any nearby castles.",
+    effect: function(q, r) {
+
+    }
+  }
 ]; // JSON for food cards -- generally for troops
-var plants = []; // JSON for plant cards -- generally for healing
-var metal = []; // JSON for metal cards -- generally for tools and traps
-var wood = []; // JSON for wood cards -- generally for traps and ranged weapons
+var plants = [
+  {
+    name: "Marigold",
+    desc: "Heals 1 HP",
+    effect: function() {
+      if (this.hp != this.maxHP) {
+        this.hp += 1;
+      }
+      this.moves--;
+    }
+  },
+  {
+    name: "Ginseng",
+    desc: "Costs 1 move. Recover 2 moves.",
+    effect: function() {
+      if (this.moves != this.maxMoves - 1) {
+        this.moves += 2;
+      } else {
+        this.moves = this.maxMoves;
+      }
+    }
+  }
+]; // JSON for plant cards -- generally for healing
+var metal = [
+  {
+    name: "Mine",
+    desc: "Place a proximity mine. Enemies take 2 damage when one tile away.",
+    effect: function(q, r) {
+      this.traps.push(new Trap(q, r, 1, 2, '')); // Add an image later
+      this.moves--;
+    }
+  }
+]; // JSON for metal cards -- generally for tools and traps
+var wood = [
+  {
+    name: "Trebuchet",
+    desc: "Costs 2 moves. Deploy and launch a one-time use trebuchet at an enemy. Deals 3 damage.",
+    effect: function(q, r) {
+      var atk = new Attack(q, r, 3);
+      atk.initiate();
+      this.move -= 2;
+    }
+  }
+]; // JSON for wood cards -- generally for traps and ranged weapons
 
 // Game variables
-var turn = 0;
 var won = false;
 var board = []; // A list of all the tiles in the game
 var zoom = 1.00; // A percentage
@@ -291,6 +539,7 @@ var tileSize = oSize;
 var boardSize = 10;
 var resourceFreq = 0.13;
 var players = [];
+var infoUp = false;
 
 // Viewing Variables
 var scrollMode = false;
@@ -301,32 +550,47 @@ var mouseY = 0;
 // Canvas Variables
 var $canvas = document.querySelector('canvas');
 var context = $canvas.getContext("2d");
-$canvas.width = 1200;
-$canvas.height = 700;
+$canvas.width = screen.width * 0.8;
+$canvas.height = screen.height * 0.7;
 
+// Border variables
+var topLeft = {
+  x: $canvas.width * 0.2,
+  y: $canvas.height * 0.05
+}
+var bottomRight = {
+  x: $canvas.width,
+  y: $canvas.height * 0.9
+}
+var boardCenter = {
+  x: (topLeft.x + bottomRight.x) / 2,
+  y: (topLeft.y + bottomRight.y) / 2
+}
+
+// Board Event Listeners
 document.addEventListener("wheel", function(e) {
-  var zoomScale = 0.15;
+  if (mouseX > topLeft.x && mouseX < bottomRight.x && mouseY > topLeft.y && mouseY < bottomRight.y) {
+    var zoomScale = 0.15;
 
-  if (e.deltaY < 0) { // Scrollin Up
-    if (zoom <= 3) {
-      zoom += zoomScale;
-      tileSize = oSize * zoom;
-    } else {
-      zoom = 3;
+    if (e.deltaY < 0) { // Scrollin Up
+      if (zoom <= 3) {
+        zoom += zoomScale;
+        tileSize = oSize * zoom;
+      } else {
+        zoom = 3;
+      }
     }
-  }
-  if (e.deltaY > 0) { // Scrollin Down
-    if (zoom >= 0.5) {
-      zoom -= zoomScale;
-      tileSize = oSize * zoom;
-    } else {
-      zoom = 0.5;
+    if (e.deltaY > 0) { // Scrollin Down
+      if (zoom >= 0.5) {
+        zoom -= zoomScale;
+        tileSize = oSize * zoom;
+      } else {
+        zoom = 0.5;
+      }
     }
+
+    // Add zoom to mouse
   }
-
-  document.getElementById("zoom-info").innerHTML = `x${Math.round(zoom * 10000) / 100}%`;
-
-  // Add zoom to mouse
 })
 
 document.addEventListener("keydown", function(e) {
@@ -346,9 +610,9 @@ document.addEventListener("keyup", function(e) {
 })
 
 document.addEventListener("mousedown", function(e) {
-  if (scrollMode) {
+  //if (scrollMode) {
     dragMode = true;
-  }
+  //}
 })
 
 document.addEventListener("mouseup", function(e) {
@@ -356,8 +620,8 @@ document.addEventListener("mouseup", function(e) {
 })
 
 document.addEventListener("mousemove", function(e) { // Panning
-  var xMaxScale = boardSize * 100;
-  var yMaxScale = boardSize * 130;
+  var xMaxScale = 10000;
+  var yMaxScale = 10000;
 
   if (dragMode) {
     if (scrollX + e.movementX > xMaxScale) {
@@ -378,20 +642,66 @@ document.addEventListener("mousemove", function(e) { // Panning
   }
 })
 
-document.addEventListener("mousemove", function(e) { // Tile identifying
+/*document.addEventListener("mousemove", function(e) { // Tile identifying
   if (zoom > 0.9) {
     for (var i = 0; i < board.length; i++) {
       if (board[i].mouseInsideTile()) {
-        document.getElementById("tile-info").innerHTML = `(${board[i].q}, ${board[i].r}): ${board[i].terrain}`;
+        var text = `(${board[i].q}, ${board[i].r}): ${board[i].terrain}`;
 
         if (board[i].resource) {
-          document.getElementById("tile-info").innerHTML += `, ${board[i].resource.name}`;
+          text += `, ${board[i].resource.name}`;
         }
+
+        context.fillStyle = "#fff"; // Info bar
+        context.fillRect($canvas.width * 0.84, $canvas.height * 0.53, $canvas.width * 0.15, $canvas.height * 0.35);
+
+        context.fillStyle = "#000";
+        context.fillText(text, $canvas.width * 0.85, $canvas.height * 0.54);
+
         break;
       }
     }
-  } else {
-    document.getElementById("tile-info").innerHTML = '';
+  }
+})*/
+
+document.addEventListener("click", function(e) { // Moving the castles
+  var clicked = false;
+
+  if (mouseX > topLeft.x && mouseX < bottomRight.x && mouseY > topLeft.y && mouseY < bottomRight.y) {
+    for (var i = 0; i < players.length; i++) { // If the player clicked on their castle
+      if (players[i].you) {
+        for (var j = 0; j < board.length; j++) {
+          if (players[i].selected && board[j].mouseInsideTile()) {
+            if (!board[j].canMoveOn) {
+              clicked = true;
+              break;
+            }
+            players[i].move(board[j].q, board[j].r);
+            players[i].selected = false;
+            clicked = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!clicked) {
+      for (var i = 0; i < board.length; i++) { // if the player clicked on a tile they want to move on
+        var end = false;
+
+        for (var j = 0; j < players.length; j++) { // May have to change this to only check the player's castle
+          if (players[j].q == board[i].q && players[j].r == board[i].r && board[i].mouseInsideTile()) {
+            players[j].selected = true;
+            end = true;
+            break;
+          } else {
+            players[j].selected = false;
+          }
+        }
+
+        if (end) {break;}
+      }
+    }
   }
 })
 
@@ -400,39 +710,65 @@ document.getElementById("shifting-thrones").addEventListener("mousemove", functi
   mouseY = e.clientY;
 })
 
+function drawInfo(li) {
+
+}
+
 function drawBoard() {
   for (var i = 0; i < board.length; i++) {
-    board[i].drawTile();
+    board[i].draw();
   }
 
   for (var i = 0; i < players.length; i++) {
-    players[i].drawPlayer();
+    players[i].draw();
+  }
+}
+
+function drawCards() { // Draw the card meny on the side (left)
+
+}
+
+function drawActions() {
+  // Buttons (in order):
+  // Extract Resource | Play Selected Card | *TBD* | End Turn
+  var extract = false;
+
+  for (var i = 0; i < players.length; i++) { // Is the player on a resource?
+    if (players[i].you) {
+      if (players[i].onResource) {
+        extract = true;
+      }
+    }
+  }
+
+  if (extract) {
+    context.fillRect($canvas.width * 0.03, $canvas.height * 0.92, $canvas.width * 0.1, $canvas.height * 0.06);
   }
 }
 
 function setupBoard(size) {
-  var q = -size;
-  var r = 0;
+  var q = -size; // Represents columns
+  var r = 0; // Represents diagonal rows
 
   while (true) {
     while (true) {
-      board.push(new Tile(q, r, terrainGen.findTerrain(q, r)));
+      board.push(new Tile(q, r, terrainGen.findTerrain(q + 100, r + 100))); // Add a new tile
 
       if (q <= 0 && r == size) {
-        break;
+        break; // If the col# is less than 0 and r reaches the bottom, move on
       } else if (q > 0 && r == size - q) {
-        break;
+        break; // If it's more than 0, and r reaches bottom, move on
       } else {
-        r++;
+        r++; // If not, continue with increasing the row#
       }
     }
 
-    if (q == size && r == 0) {
+    if (q == size && r == 0) { // If last column and last row, end
       break;
-    } else if (q < 0) {
+    } else if (q < 0) { // Reset to next column
       q++;
       r = -size - q;
-    } else if (q >= 0) {
+    } else if (q >= 0) { // Reset to next column
       q++;
       r = -size;
     }
@@ -454,7 +790,7 @@ function destroyBorders() {
       break;
     }
 
-    if (checkEdge(board[count])) {
+    if (board[count].checkEdge()) {
       board.splice(count, 1);
       count -= 1;
     }
@@ -465,6 +801,16 @@ function destroyBorders() {
   boardSize--;
 }
 
+function findTile(q, r) {
+  for (var i = 0; i < board.length; i++) {
+    if (board[i].q == q && board[i].r == r) {
+      return board[i];
+    }
+  }
+
+  return false;
+}
+
 function init() {
   setupBoard(boardSize);
   drawBoard(board);
@@ -473,16 +819,39 @@ function init() {
 
 function update() { // TODO: Add in selection of tiles
   // Animate stuff
+  for (var i = 0; i < players.length; i++) {
+    players[i].update();
+  }
 }
 
 function draw() {
   context.clearRect(0, 0, $canvas.width, $canvas.height);
+
+  context.fillStyle = "#99f"; // board
+  context.fillRect(topLeft.x, topLeft.y, $canvas.width - topLeft.x, $canvas.height * (bottomRight.y - topLeft.y));
+  // Replace fillRect with an image of... a void? IDK
   drawBoard();
+
+  context.fillStyle = "#9f9"; // Game bar
+  context.fillRect(0, 0, $canvas.width, $canvas.height * 0.05);
+  // Replace fillRect with suitable image
+
+  context.fillStyle = "#000"; // Card menu
+  context.fillRect(0, $canvas.height * 0.05, $canvas.width * 0.2, $canvas.height * 0.85);
+  // Replace fillRect with suitable image
+  drawCards();
+
+  context.fillStyle = "#f99"; // Action bar
+  context.fillRect(0, $canvas.height * 0.9, $canvas.width, $canvas.height * 0.1);
+  // Replace fillRect with suitable image
+  drawActions();
 
   return 0;
 }
 
 function animate() {
+  // Add a state machine in update for what part of the game the player is looking at
+  // i.e. The selection screen, home page, game board, etc.
   update();
 
   if (draw() == 0) {
@@ -496,6 +865,8 @@ function animate() {
 
 var terrainGen = new SimplexNoise(Math);
 
-players.push(new Player('white'))
+//var testTile = new Tile(0, 0, "plains");
+
+players.push(new Player('white', 'lol'))
 
 init();
