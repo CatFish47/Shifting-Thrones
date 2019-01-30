@@ -8,23 +8,23 @@
 // Sean McCullough banksean@gmail.com
 
 /**
- * You can pass in a random number generator object if you like.
- * It is assumed to have a random() method.
- */
+* You can pass in a random number generator object if you like.
+* It is assumed to have a random() method.
+*/
 var SimplexNoise = function(r) {
-	if (r == undefined) r = Math;
+  if (r == undefined) r = Math;
   this.grad3 = [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],
-                                 [1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],
-                                 [0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+  [1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],
+  [0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
   this.p = [];
   for (var i=0; i<256; i++) {
-	  this.p[i] = Math.floor(r.random()*256);
+    this.p[i] = Math.floor(r.random()*256);
   }
   // To remove the need for index wrapping, double the permutation table length
   this.perm = [];
   for(var i=0; i<512; i++) {
-		this.perm[i]=this.p[i & 255];
-	}
+    this.perm[i]=this.p[i & 255];
+  }
 
   // A lookup table to traverse the simplex around a given point in 4D.
   // Details can be found where this table is used, in the 4D noise method.
@@ -37,10 +37,10 @@ var SimplexNoise = function(r) {
     [0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],
     [2,0,1,3],[0,0,0,0],[0,0,0,0],[0,0,0,0],[3,0,1,2],[3,0,2,1],[0,0,0,0],[3,1,2,0],
     [2,1,0,3],[0,0,0,0],[0,0,0,0],[0,0,0,0],[3,1,0,2],[0,0,0,0],[3,2,0,1],[3,2,1,0]];
-};
+  };
 
 SimplexNoise.prototype.dot = function(g, x, y) {
-	return g[0]*x + g[1]*y;
+  return g[0]*x + g[1]*y;
 };
 
 SimplexNoise.prototype.findTerrain = function(xin, yin) {
@@ -161,18 +161,24 @@ class Player { // TODO: Implement player depending on what class they choose
         positions[i].canMoveOn = true;
       }
     }
+
+    if (findTile(this.q, this.r).resource) {
+      this.onResource = true;
+    } else {
+      this.onResource = false;
+    }
   }
 
   move(q, r) {
     //if (this.moves > 0) {
-      this.q = q;
-      this.r = r;
+    this.q = q;
+    this.r = r;
 
-      for (var i = 0; i < board.length; i++) {
-        board[i].canMoveOn = false;
-      }
+    for (var i = 0; i < board.length; i++) {
+      board[i].canMoveOn = false;
+    }
 
-      this.moves--;
+    this.moves--;
     //}
   }
 
@@ -227,13 +233,31 @@ class Player { // TODO: Implement player depending on what class they choose
     return false;
   }
 
-  collectResource() {
+  collectResource(q, r) {
+    var setName = findTile(q, r).resource.name;
 
+    if (findTile(q, r).resource.cooldown == 0) {
+      for (var i = 0; i < 3; i++) {
+        this.collectCard(setName);
+      }
+    }
+
+    findTile(q, r).resource.maxCooldown();
+
+    this.moves--;
+
+    console.log(this.cards)
+  }
+
+  collectCard(setName) {
+    var set = eval(setName);
+
+    this.cards.push(set[Math.floor(Math.random() * set.length)]);
   }
 }
 
 // Card Class
-class Card { // TODO: Add in cards depending on what the set is and determines what the ability is depending on an array of names
+class Card {
   constructor(set, name) {
     var card;
 
@@ -289,7 +313,8 @@ class Tile {
     var x = boardCenter.x + tileSize * (this.q * 3/2) + scrollX;
     var y = boardCenter.y + tileSize * (this.q * Math.sqrt(3)/2 + this.r * Math.sqrt(3)) + scrollY;
 
-    if (mouseX < x - tileSize || mouseX > x + tileSize || mouseY > y + tileSize * Math.sqrt(3)/2 || mouseY < y - tileSize * Math.sqrt(3)/2) {
+    if (mouseX < x - tileSize || mouseX > x + tileSize ||
+      mouseY > y + tileSize * Math.sqrt(3)/2 || mouseY < y - tileSize * Math.sqrt(3)/2) {
       return false; // If the mouse is not in the hexagon's bounding box, return false
     } else {
       var tempX = mouseX; // Make temporary mouse vars
@@ -330,6 +355,8 @@ class Tile {
     context.lineTo(x - tileSize * 1/2, y + tileSize * Math.sqrt(3)/2);
     context.stroke();
     context.closePath();
+
+    context.lineWidth = 1;
 
 
     if (this.terrain == "mountain") {
@@ -423,9 +450,9 @@ class Trap {
 
 // Units class
 /*class Unit {
-  constructor(q, r, dmg, ) {
+constructor(q, r, dmg, ) {
 
-  }
+}
 }*/
 
 // Attack Class
@@ -443,29 +470,49 @@ class Attack {
 
 // Resources Class
 // TODO: Add a static function for gathering cards and for cooldowns for gathering
-class Metal {
+class Resource {
   constructor() {
+    this.cooldown = 0;
+  }
+
+  maxCooldown() {
+    this.cooldown = 2;
+  }
+
+  reduceCooldown() {
+    if (this.cooldown > 0) {
+      this.cooldown--;
+    }
+  }
+}
+
+class Metal extends Resource {
+  constructor() {
+    super();
     this.image = new Image();
     this.image.src = "images/metal.png";
     this.name = "metal";
   }
 }
-class Plants {
+class Plants extends Resource {
   constructor() {
+    super();
     this.image = new Image();
     this.image.src = "images/plants.png";
     this.name = "plants";
   }
 }
-class Food {
+class Food extends Resource {
   constructor() {
+    super();
     this.image = new Image();
     this.image.src = "images/food.png";
     this.name = "food";
   }
 }
-class Wood {
+class Wood extends Resource {
   constructor() {
+    super();
     this.image = new Image();
     this.image.src = "images/wood.png";
     this.name = "wood";
@@ -474,14 +521,14 @@ class Wood {
 
 // General variables
 var playerId = "lol";
+
 var food = [
   {
     name: "Footsoldiers",
     desc: "Places a camp of footsoldiers that will deal 1 damage to any nearby castles.",
     effect: function(q, r) {
 
-    }
-  }
+    }}
 ]; // JSON for food cards -- generally for troops
 var plants = [
   {
@@ -536,16 +583,21 @@ var scrollX = 0; // How far away the user's "sight" is from the center
 var scrollY = 0;
 var oSize = 30;
 var tileSize = oSize;
-var boardSize = 10;
-var resourceFreq = 0.13;
+var boardSize = 5;
+var resourceFreq = 0.2;
 var players = [];
 var infoUp = false;
+
+// Button Condition Variables
+var extract = false;
 
 // Viewing Variables
 var scrollMode = false;
 var dragMode = false;
 var mouseX = 0;
 var mouseY = 0;
+var cardMenuScroll = 0;
+var cardHeight = 0.05;
 
 // Canvas Variables
 var $canvas = document.querySelector('canvas');
@@ -568,9 +620,9 @@ var boardCenter = {
 }
 
 // Board Event Listeners
-document.addEventListener("wheel", function(e) {
+document.addEventListener("wheel", function(e) {// Zooming
   if (mouseX > topLeft.x && mouseX < bottomRight.x && mouseY > topLeft.y && mouseY < bottomRight.y) {
-    var zoomScale = 0.15;
+    var zoomScale = 0.1;
 
     if (e.deltaY < 0) { // Scrollin Up
       if (zoom <= 3) {
@@ -611,7 +663,7 @@ document.addEventListener("keyup", function(e) {
 
 document.addEventListener("mousedown", function(e) {
   //if (scrollMode) {
-    dragMode = true;
+  dragMode = true;
   //}
 })
 
@@ -643,45 +695,43 @@ document.addEventListener("mousemove", function(e) { // Panning
 })
 
 /*document.addEventListener("mousemove", function(e) { // Tile identifying
-  if (zoom > 0.9) {
-    for (var i = 0; i < board.length; i++) {
-      if (board[i].mouseInsideTile()) {
-        var text = `(${board[i].q}, ${board[i].r}): ${board[i].terrain}`;
+if (zoom > 0.9) {
+for (var i = 0; i < board.length; i++) {
+if (board[i].mouseInsideTile()) {
+var text = `(${board[i].q}, ${board[i].r}): ${board[i].terrain}`;
 
-        if (board[i].resource) {
-          text += `, ${board[i].resource.name}`;
-        }
+if (board[i].resource) {
+text += `, ${board[i].resource.name}`;
+}
 
-        context.fillStyle = "#fff"; // Info bar
-        context.fillRect($canvas.width * 0.84, $canvas.height * 0.53, $canvas.width * 0.15, $canvas.height * 0.35);
+context.fillStyle = "#fff"; // Info bar
+context.fillRect($canvas.width * 0.84, $canvas.height * 0.53, $canvas.width * 0.15, $canvas.height * 0.35);
 
-        context.fillStyle = "#000";
-        context.fillText(text, $canvas.width * 0.85, $canvas.height * 0.54);
+context.fillStyle = "#000";
+context.fillText(text, $canvas.width * 0.85, $canvas.height * 0.54);
 
-        break;
-      }
-    }
-  }
+break;
+}
+}
+}
 })*/
 
 document.addEventListener("click", function(e) { // Moving the castles
   var clicked = false;
 
   if (mouseX > topLeft.x && mouseX < bottomRight.x && mouseY > topLeft.y && mouseY < bottomRight.y) {
-    for (var i = 0; i < players.length; i++) { // If the player clicked on their castle
-      if (players[i].you) {
-        for (var j = 0; j < board.length; j++) {
-          if (players[i].selected && board[j].mouseInsideTile()) {
-            if (!board[j].canMoveOn) {
-              clicked = true;
-              break;
-            }
-            players[i].move(board[j].q, board[j].r);
-            players[i].selected = false;
-            clicked = true;
-            break;
-          }
+    var you = getYou();
+
+    for (var j = 0; j < board.length; j++) {
+      if (you.selected && board[j].mouseInsideTile()) {
+        if (!board[j].canMoveOn) {
+          clicked = true;
+          break;
         }
+        you.move(board[j].q, board[j].r);
+        you.selected = false;
+        clicked = true;
+        break;
       }
     }
 
@@ -689,26 +739,60 @@ document.addEventListener("click", function(e) { // Moving the castles
       for (var i = 0; i < board.length; i++) { // if the player clicked on a tile they want to move on
         var end = false;
 
-        for (var j = 0; j < players.length; j++) { // May have to change this to only check the player's castle
-          if (players[j].q == board[i].q && players[j].r == board[i].r && board[i].mouseInsideTile()) {
-            players[j].selected = true;
-            end = true;
-            break;
-          } else {
-            players[j].selected = false;
-          }
+        for (var j = 0; j < players.length; j++) {
+        if (players[j].q == board[i].q && players[j].r == board[i].r && board[i].mouseInsideTile()) {
+          players[j].selected = true;
+          end = true;
+          break;
+        } else {
+          players[j].selected = false;
         }
+      }
 
-        if (end) {break;}
+      if (end) {break;}
+    }
+  }
+}
+})
+
+document.getElementById("shifting-thrones").addEventListener("mousemove", function(e) {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+})
+// Mouse positions
+
+document.addEventListener("click", function(e) { // For extract button
+  if (extract &&
+    mouseX > $canvas.width * 0.02 && mouseX < $canvas.width * 0.22 &&
+    mouseY > $canvas.height * 0.92 && mouseY < $canvas.height * 0.98) {
+
+      var you = getYou();
+      you.collectResource(you.q, you.r);
+    }
+  })
+
+document.addEventListener("wheel", function(e) {// Card Menu Scrolling
+  if (mouseX > 0 && mouseX < topLeft.x && mouseY > topLeft.y && mouseY < bottomRight.y) {
+    if (e.deltaY < 0) { // Scrollin Up
+      if (getYou().cards.length > 17 &&
+          cardMenuScroll > -(getYou().cards.length - 17) * $canvas.height * 0.05) {
+        cardMenuScroll -= $canvas.height * 0.05 / 8;
+      }
+    } else {
+      if (cardMenuScroll < 0) {
+        cardMenuScroll += $canvas.height * 0.05 / 8;
       }
     }
   }
 })
 
-document.getElementById("shifting-thrones").addEventListener("mousemove", function(e) { // Getting mouse positions
-  mouseX = e.clientX;
-  mouseY = e.clientY;
-})
+function getYou() {
+  for (var i in players) {
+    if (players[i].you) {
+      return players[i];
+    }
+  }
+}
 
 function drawInfo(li) {
 
@@ -725,24 +809,46 @@ function drawBoard() {
 }
 
 function drawCards() { // Draw the card meny on the side (left)
+  var cards = getYou().cards;
 
+  context.font = "15px Georgia";
+
+  for (var i in cards) {
+    context.fillStyle = "#d2b38c";
+    context.fillRect(0, cardMenuScroll + $canvas.height * 0.05 + i * $canvas.height * cardHeight,
+      $canvas.width * 0.2, $canvas.height * (cardHeight - 0.001));
+    context.fillStyle = "#000";
+    context.fillText(`${cards[i].name}`, $canvas.width * 0.005,
+      cardMenuScroll + $canvas.height * 0.09 + i * $canvas.height * cardHeight);
+  }
 }
 
 function drawActions() {
   // Buttons (in order):
   // Extract Resource | Play Selected Card | *TBD* | End Turn
-  var extract = false;
+  var resourceCooldown;
 
-  for (var i = 0; i < players.length; i++) { // Is the player on a resource?
-    if (players[i].you) {
-      if (players[i].onResource) {
-        extract = true;
-      }
-    }
+  var you = getYou(); // Is the player on the resource?
+
+  if (you.onResource) {
+    extract = true;
+    resourceCooldown = findTile(you.q, you.r).resource.cooldown;
+  } else {
+    extract = false;
   }
 
   if (extract) {
-    context.fillRect($canvas.width * 0.03, $canvas.height * 0.92, $canvas.width * 0.1, $canvas.height * 0.06);
+    context.fillStyle = "#fff";
+    context.fillRect($canvas.width * 0.02,
+      $canvas.height * 0.92, $canvas.width * 0.2, $canvas.height * 0.06);
+    context.fillStyle = "#000";
+    context.font = "20px Georgia";
+
+    if (resourceCooldown == 0) {
+      context.fillText("Extract Resource", $canvas.width * 0.02, $canvas.height * 0.97);
+    } else {
+      context.fillText(`Cooldown: ${resourceCooldown}`, $canvas.width * 0.02, $canvas.height * 0.97);
+    }
   }
 }
 
@@ -828,18 +934,19 @@ function draw() {
   context.clearRect(0, 0, $canvas.width, $canvas.height);
 
   context.fillStyle = "#99f"; // board
-  context.fillRect(topLeft.x, topLeft.y, $canvas.width - topLeft.x, $canvas.height * (bottomRight.y - topLeft.y));
+  context.fillRect(topLeft.x, topLeft.y, $canvas.width - topLeft.x,
+    $canvas.height * (bottomRight.y - topLeft.y));
   // Replace fillRect with an image of... a void? IDK
   drawBoard();
-
-  context.fillStyle = "#9f9"; // Game bar
-  context.fillRect(0, 0, $canvas.width, $canvas.height * 0.05);
-  // Replace fillRect with suitable image
 
   context.fillStyle = "#000"; // Card menu
   context.fillRect(0, $canvas.height * 0.05, $canvas.width * 0.2, $canvas.height * 0.85);
   // Replace fillRect with suitable image
   drawCards();
+
+  context.fillStyle = "#9f9"; // Game bar
+  context.fillRect(0, 0, $canvas.width, $canvas.height * 0.05);
+  // Replace fillRect with suitable image
 
   context.fillStyle = "#f99"; // Action bar
   context.fillRect(0, $canvas.height * 0.9, $canvas.width, $canvas.height * 0.1);
@@ -867,6 +974,8 @@ var terrainGen = new SimplexNoise(Math);
 
 //var testTile = new Tile(0, 0, "plains");
 
-players.push(new Player('white', 'lol'))
+players.push(new Player('white', 'lol'));
+
+players[0].collectCard("metal");
 
 init();
